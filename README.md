@@ -2,6 +2,8 @@
 
 Plataforma local para correr competencias entre SAT solvers sobre instancias CNF.
 
+![SATCOMP](https://github.com/maxtuno/satcomp/blob/main/screen.jpeg)
+
 ## Requisitos
 
 - Python 3.11+
