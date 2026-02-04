@@ -1,0 +1,6 @@
+name: slime
+version: "2021"
+bin: "wsl slime"
+command_template: "{bin} {cnf}"
+supports_seed: false
+default_threads: 1

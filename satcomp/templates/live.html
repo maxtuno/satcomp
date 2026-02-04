@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>satcomp live run {{ run.id }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg: #ffffff;
+      --text: #111827;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --card: #f9fafb;
+      --ok: #16a34a;
+      --warn: #f59e0b;
+      --bad: #dc2626;
+      --info: #2563eb;
+    }
+    body { font-family: ui-sans-serif, system-ui, sans-serif; margin: 24px; color: var(--text); background: var(--bg); }
+    a { color: #0b5; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+    .title { display: flex; flex-direction: column; gap: 4px; }
+    .subtitle { color: var(--muted); font-size: 13px; }
+    .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    button { padding: 6px 10px; border: 1px solid var(--border); background: white; border-radius: 8px; cursor: pointer; }
+    button:hover { background: #f3f4f6; }
+    input[type="number"] { width: 90px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; }
+    .grid { display: grid; grid-template-columns: repeat(4, minmax(140px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .card { padding: 12px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; }
+    .card .k { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+    .card .v { font-size: 18px; font-weight: 650; }
+    .bar { height: 10px; background: #eef2ff; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
+    .bar > div { height: 100%; background: #22c55e; width: 0%; transition: width 0.2s ease; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 18px; }
+    th, td { border-bottom: 1px solid var(--border); padding: 8px; text-align: left; font-size: 13px; vertical-align: top; }
+    th { background: #f4f4f4; position: sticky; top: 0; z-index: 1; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--border); background: white; }
+    .pill.ok { color: var(--ok); border-color: #bbf7d0; background: #f0fdf4; }
+    .pill.running { color: var(--info); border-color: #bfdbfe; background: #eff6ff; }
+    .pill.pending { color: var(--muted); border-color: var(--border); background: #fff; }
+    .pill.timeout, .pill.memout { color: var(--warn); border-color: #fde68a; background: #fffbeb; }
+    .pill.crash, .pill.error { color: var(--bad); border-color: #fecaca; background: #fef2f2; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; }
+    .section-title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 18px 0 8px; }
+    .section-title h2 { margin: 0; font-size: 16px; }
+    .hint { color: var(--muted); font-size: 12px; }
+    .error { color: var(--bad); }
+
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: none; align-items: center; justify-content: center; padding: 18px; }
+    .modal { background: white; border: 1px solid var(--border); border-radius: 12px; width: min(1100px, 95vw); max-height: 85vh; overflow: auto; }
+    .modal header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: white; }
+    .modal pre { margin: 0; padding: 12px 14px; white-space: pre-wrap; word-break: break-word; }
+    .modal .split { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+    .modal .split > div { border-right: 1px solid var(--border); }
+    .modal .split > div:last-child { border-right: none; }
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
+      .modal .split { grid-template-columns: 1fr; }
+      .modal .split > div { border-right: none; border-bottom: 1px solid var(--border); }
+      .modal .split > div:last-child { border-bottom: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="title">
+      <div><strong>Live</strong> · Run {{ run.id }} · {{ run.name }}</div>
+      <div class="subtitle">
+        Creado: <span class="mono">{{ run.created_at }}</span>
+        · <a href="/runs/{{ run.id }}">ver detalle</a>
+      </div>
+    </div>
+    <div class="controls">
+      <span class="hint">Auto-refresh (ms)</span>
+      <input id="intervalMs" type="number" min="250" step="250" value="2000" />
+      <button id="toggle">Pausar</button>
+      <button id="refreshNow">Actualizar</button>
+      <span id="statusText" class="hint"></span>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="k">Progreso</div>
+      <div class="v"><span id="finished">0</span>/<span id="total">0</span></div>
+      <div class="bar" style="margin-top: 10px;"><div id="progressBar"></div></div>
+      <div class="hint" style="margin-top: 6px;">Pendientes: <span id="pending">0</span> · Corriendo: <span id="running">0</span></div>
+    </div>
+    <div class="card">
+      <div class="k">Ok</div>
+      <div class="v" id="ok">0</div>
+      <div class="hint">Incluye SAT/UNSAT</div>
+    </div>
+    <div class="card">
+      <div class="k">Crashes / Timeouts</div>
+      <div class="v"><span id="crash">0</span> / <span id="timeout">0</span></div>
+      <div class="hint">Memout: <span id="memout">0</span> · Error: <span id="error">0</span></div>
+    </div>
+    <div class="card">
+      <div class="k">ETA</div>
+      <div class="v" id="eta">—</div>
+      <div class="hint">Última actualización: <span id="serverTime" class="mono">—</span></div>
+    </div>
+  </div>
+
+  <div class="section-title">
+    <h2>Por solver</h2>
+    <div class="hint">Ordenado por nombre</div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Solver</th>
+        <th>Solved</th>
+        <th>Unknown</th>
+        <th>Pending</th>
+        <th>Running</th>
+        <th>Crash</th>
+        <th>Timeout</th>
+        <th>Memout</th>
+        <th>Error</th>
+        <th>Avg (s)</th>
+        <th>PAR2</th>
+      </tr>
+    </thead>
+    <tbody id="solversBody">
+      <tr><td colspan="11" class="hint">Cargando…</td></tr>
+    </tbody>
+  </table>
+
+  <div class="section-title">
+    <h2>Corriendo ahora</h2>
+    <div class="hint">Máx. 50</div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Result</th>
+        <th>Instancia</th>
+        <th>Solver</th>
+        <th>Started</th>
+        <th>Timeout</th>
+      </tr>
+    </thead>
+    <tbody id="runningBody">
+      <tr><td colspan="5" class="hint">—</td></tr>
+    </tbody>
+  </table>
+
+  <div class="section-title">
+    <h2>Últimos resultados</h2>
+    <div class="hint">Máx. 50 · Click en Logs para ver stdout/stderr</div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Finished</th>
+        <th>Instancia</th>
+        <th>Solver</th>
+        <th>Status</th>
+        <th>Result</th>
+        <th>Wall (s)</th>
+        <th>Exit</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="recentBody">
+      <tr><td colspan="8" class="hint">—</td></tr>
+    </tbody>
+  </table>
+
+  <div id="modalBackdrop" class="modal-backdrop">
+    <div class="modal">
+      <header>
+        <div class="mono" id="modalTitle">Logs</div>
+        <button id="closeModal">Cerrar</button>
+      </header>
+      <div class="split">
+        <div>
+          <div style="padding: 10px 14px; border-bottom: 1px solid var(--border); background: #fafafa;"><strong>stdout</strong></div>
+          <pre id="stdoutLog" class="mono"></pre>
+        </div>
+        <div>
+          <div style="padding: 10px 14px; border-bottom: 1px solid var(--border); background: #fafafa;"><strong>stderr</strong></div>
+          <pre id="stderrLog" class="mono"></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const RUN_ID = {{ run.id }};
+    let timer = null;
+    let paused = false;
+
+    const el = (id) => document.getElementById(id);
+
+    function formatSeconds(value) {
+      if (value === null || value === undefined || Number.isNaN(value)) return "—";
+      if (value < 60) return value.toFixed(1) + "s";
+      const m = Math.floor(value / 60);
+      const s = Math.floor(value % 60);
+      return `${m}m ${s}s`;
+    }
+
+    function formatNumber(value, digits=2) {
+      if (value === null || value === undefined || Number.isNaN(value)) return "";
+      return Number(value).toFixed(digits);
+    }
+
+    function pill(status) {
+      const cls = (status || "pending").toLowerCase();
+      return `<span class="pill ${cls}">${status}</span>`;
+    }
+
+    function setStatusText(text, isError=false) {
+      const node = el("statusText");
+      node.textContent = text || "";
+      node.className = isError ? "hint error" : "hint";
+    }
+
+    function updateCounts(counts, etaSeconds, serverTime) {
+      const total = Number(counts.total || 0);
+      const finished = Number(counts.finished || 0);
+      el("total").textContent = total;
+      el("finished").textContent = finished;
+      el("pending").textContent = Number(counts.pending || 0);
+      el("running").textContent = Number(counts.running || 0);
+      el("ok").textContent = Number(counts.ok || 0);
+      el("timeout").textContent = Number(counts.timeout || 0);
+      el("memout").textContent = Number(counts.memout || 0);
+      el("crash").textContent = Number(counts.crash || 0);
+      el("error").textContent = Number(counts.error || 0);
+      el("eta").textContent = etaSeconds ? formatSeconds(etaSeconds) : "—";
+      el("serverTime").textContent = serverTime || "—";
+
+      const pct = total ? Math.round((finished / total) * 1000) / 10 : 0;
+      el("progressBar").style.width = `${pct}%`;
+    }
+
+    function updateSolvers(solvers) {
+      const body = el("solversBody");
+      if (!solvers || !solvers.length) {
+        body.innerHTML = `<tr><td colspan="11" class="hint">—</td></tr>`;
+        return;
+      }
+      body.innerHTML = solvers.map(s => {
+        const avg = s.avg_wall_time === null ? "" : formatNumber(s.avg_wall_time, 3);
+        const par2 = s.par2 === null ? "" : formatNumber(s.par2, 3);
+        return `
+          <tr>
+            <td class="mono">${escapeHtml(s.solver || "")}</td>
+            <td>${s.solved || 0}/${s.total || 0} (${formatNumber(s.solve_rate || 0, 1)}%)</td>
+            <td>${s.unknown || 0}</td>
+            <td>${s.pending || 0}</td>
+            <td>${s.running || 0}</td>
+            <td>${s.crash || 0}</td>
+            <td>${s.timeout || 0}</td>
+            <td>${s.memout || 0}</td>
+            <td>${s.error || 0}</td>
+            <td>${avg}</td>
+            <td>${par2}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    function updateRunning(rows) {
+      const body = el("runningBody");
+      if (!rows || !rows.length) {
+        body.innerHTML = `<tr><td colspan="5" class="hint">—</td></tr>`;
+        return;
+      }
+      body.innerHTML = rows.map(r => `
+        <tr>
+          <td class="mono">#${r.result_id}</td>
+          <td class="mono">${escapeHtml(r.instance_rel_path || "")}</td>
+          <td class="mono">${escapeHtml(r.solver || "")}</td>
+          <td class="mono">${escapeHtml(r.started_at || "")}</td>
+          <td>${r.timeout || ""}</td>
+        </tr>
+      `).join("");
+    }
+
+    function updateRecent(rows) {
+      const body = el("recentBody");
+      if (!rows || !rows.length) {
+        body.innerHTML = `<tr><td colspan="8" class="hint">—</td></tr>`;
+        return;
+      }
+      body.innerHTML = rows.map(r => `
+        <tr>
+          <td class="mono">${escapeHtml(r.finished_at || "")}</td>
+          <td class="mono">${escapeHtml(r.instance_rel_path || "")}</td>
+          <td class="mono">${escapeHtml(r.solver || "")}</td>
+          <td>${pill(r.status || "")}</td>
+          <td class="mono">${escapeHtml(r.result || "")}</td>
+          <td>${r.wall_time === null ? "" : formatNumber(r.wall_time, 3)}</td>
+          <td class="mono">${r.exit_code === null ? "" : r.exit_code}</td>
+          <td><button onclick="openLogs(${r.result_id})">Logs</button></td>
+        </tr>
+      `).join("");
+    }
+
+    function escapeHtml(text) {
+      return String(text)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll("\"", "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    async function fetchState() {
+      const url = `/api/runs/${RUN_ID}/live_state?recent_limit=50&running_limit=50`;
+      const resp = await fetch(url, { cache: "no-store" });
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(text || `HTTP ${resp.status}`);
+      }
+      return await resp.json();
+    }
+
+    async function refresh() {
+      if (paused) return;
+      try {
+        setStatusText("Actualizando…");
+        const data = await fetchState();
+        updateCounts(data.counts || {}, data.eta_seconds, data.server_time);
+        updateSolvers(data.solvers || []);
+        updateRunning(data.running || []);
+        updateRecent(data.recent || []);
+        setStatusText("");
+      } catch (err) {
+        setStatusText("Error: " + (err && err.message ? err.message : String(err)), true);
+      }
+    }
+
+    function restartTimer() {
+      if (timer) clearInterval(timer);
+      const ms = Number(el("intervalMs").value || 2000);
+      timer = setInterval(refresh, Math.max(250, ms));
+    }
+
+    async function openLogs(resultId) {
+      try {
+        el("modalBackdrop").style.display = "flex";
+        el("modalTitle").textContent = `Logs · result #${resultId}`;
+        el("stdoutLog").textContent = "Cargando…";
+        el("stderrLog").textContent = "Cargando…";
+        const resp = await fetch(`/api/results/${resultId}/logs?max_bytes=65536`, { cache: "no-store" });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        el("stdoutLog").textContent = data.stdout || "";
+        el("stderrLog").textContent = data.stderr || "";
+      } catch (err) {
+        el("stdoutLog").textContent = "";
+        el("stderrLog").textContent = "Error: " + (err && err.message ? err.message : String(err));
+      }
+    }
+
+    function closeModal() {
+      el("modalBackdrop").style.display = "none";
+      el("stdoutLog").textContent = "";
+      el("stderrLog").textContent = "";
+    }
+
+    el("closeModal").addEventListener("click", closeModal);
+    el("modalBackdrop").addEventListener("click", (e) => {
+      if (e.target === el("modalBackdrop")) closeModal();
+    });
+
+    el("toggle").addEventListener("click", () => {
+      paused = !paused;
+      el("toggle").textContent = paused ? "Reanudar" : "Pausar";
+      if (!paused) refresh();
+    });
+    el("refreshNow").addEventListener("click", () => refresh());
+    el("intervalMs").addEventListener("change", () => restartTimer());
+
+    restartTimer();
+    refresh();
+  </script>
+</body>
+</html>

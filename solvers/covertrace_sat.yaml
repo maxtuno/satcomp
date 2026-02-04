@@ -1,0 +1,6 @@
+name: covertrace_sat
+version: "0.0.1"
+bin: "wsl covertrace_sat"
+command_template: "{bin} {cnf}"
+supports_seed: false
+default_threads: 1

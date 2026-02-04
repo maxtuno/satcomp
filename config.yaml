@@ -1,0 +1,15 @@
+version: 0.1.0
+paths:
+  benchmarks_dir: "./benchmarks"
+  solvers_dir: "./solvers"
+  runs_dir: "./runs"
+  reports_dir: "./reports"
+  data_dir: "./data"
+  db_path: "./data/results.db"
+
+defaults:
+  timeout: 60
+  mem_mb: 2048
+  threads: 1
+  jobs: 2
+  save_model: false

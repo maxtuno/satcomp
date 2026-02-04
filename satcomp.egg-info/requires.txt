@@ -1,0 +1,10 @@
+typer>=0.9.0
+pyyaml>=6.0
+fastapi>=0.110
+uvicorn>=0.27
+jinja2>=3.1
+plotly>=5.18
+psutil>=5.9
+
+[dev]
+pytest>=7.4

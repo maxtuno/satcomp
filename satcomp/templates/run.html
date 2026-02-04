@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>satcomp run {{ run.id }}</title>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, sans-serif; margin: 24px; color: #111; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 24px; }
+    th, td { border-bottom: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background: #f4f4f4; }
+    .card { padding: 12px; background: #f9f9f9; margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+  <h1>Run {{ run.id }} - {{ run.name }}</h1>
+  <div class="card">
+    <div><strong>Created:</strong> {{ run.created_at }}</div>
+    <div><strong>Tags:</strong> {{ run.tags or "" }}</div>
+    <div><strong>Notes:</strong> {{ run.notes or "" }}</div>
+    <div><strong>Total tasks:</strong> {{ total }}</div>
+    <div><strong>Live:</strong> <a href="/runs/{{ run.id }}/live">/runs/{{ run.id }}/live</a></div>
+  </div>
+
+  <h2>Solver Metrics</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Solver</th>
+        <th>Solved</th>
+        <th>Unknown</th>
+        <th>Solve Rate</th>
+        <th>Avg</th>
+        <th>Median</th>
+        <th>P95</th>
+        <th>PAR2</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for row in solver_stats %}
+      <tr>
+        <td>{{ row.solver }}</td>
+        <td>{{ row.solved }}/{{ row.total }}</td>
+        <td>{{ row.unknown }}</td>
+        <td>{{ "%.1f" % row.solve_rate }}%</td>
+        <td>{{ row.avg or "" }}</td>
+        <td>{{ row.median or "" }}</td>
+        <td>{{ row.p95 or "" }}</td>
+        <td>{{ row.par2 or "" }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>Cactus Plot</h2>
+  {{ cactus_html | safe }}
+
+  <h2>Pairwise</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Solver A</th>
+        <th>Solver B</th>
+        <th>A Only</th>
+        <th>B Only</th>
+        <th>Both</th>
+        <th>Both Same</th>
+        <th>Both Diff</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for row in pairwise %}
+      <tr>
+        <td>{{ row.solver_a }}</td>
+        <td>{{ row.solver_b }}</td>
+        <td>{{ row.a_only }}</td>
+        <td>{{ row.b_only }}</td>
+        <td>{{ row.both }}</td>
+        <td>{{ row.both_same }}</td>
+        <td>{{ row.both_diff }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>Results</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Instance</th>
+        <th>Solver</th>
+        <th>Status</th>
+        <th>Result</th>
+        <th>Wall Time</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for row in results %}
+      <tr>
+        <td>{{ row.instance_rel_path }}</td>
+        <td>{{ row.solver_name }} {{ row.solver_version }}</td>
+        <td>{{ row.status }}</td>
+        <td>{{ row.result }}</td>
+        <td>{{ row.wall_time or "" }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

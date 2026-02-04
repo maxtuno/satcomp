@@ -1,0 +1,2 @@
+[console_scripts]
+satcomp = satcomp.cli:app

@@ -1,0 +1,6 @@
+name: kissat
+version: "1.5.8"
+bin: "wsl kissat"
+command_template: "{bin} {cnf}"
+supports_seed: false
+default_threads: 1
